@@ -4,7 +4,7 @@ import { SERPSnapshot, OrganicResult, AIOverview, AIOverviewCitation, AIOverview
  * Backend SERP API key configuration placeholder.
  * Replace "ADD_YOUR_SERP_API_KEY_HERE" with your actual SerpApi key (e.g. from serpapi.com).
  */
-export const HARDCODED_SERP_API_KEY = "ADD_YOUR_SERP_API_KEY_HERE";
+export const HARDCODED_SERP_API_KEY = "4cdbf5fab6e7a4a0e221eb326179b1f27af9ded36db6a47365e881269763363a";
 
 /**
  * Helper to safely extract domain name from URL
