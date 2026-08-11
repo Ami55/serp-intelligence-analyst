@@ -2,9 +2,24 @@ import type { AnalysisReport, SERPSnapshot } from '../types';
 
 const INDIGO: [number, number, number] = [79, 70, 229];
 const SLATE: [number, number, number] = [30, 41, 59];
+const CONTENT_WIDTH = 511;
 
 function safeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70) || 'serp-report';
+}
+
+function cleanText(value: unknown, maxLength = 260) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (/^(CAES|data:|[A-Za-z0-9_=-]{120,})/.test(text)) return 'Provider identifier omitted';
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function cleanCitationTitle(title: string | undefined, domain: string, url: string) {
+  const cleaned = cleanText(title, 150);
+  if (cleaned && cleaned !== 'Provider identifier omitted') return cleaned;
+  if (domain) return `Source from ${cleanText(domain, 60)}`;
+  try { return `Source from ${new URL(url).hostname.replace(/^www\./, '')}`; } catch { return 'AI Overview source'; }
 }
 
 export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisReport | null) {
@@ -16,6 +31,7 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
   const margin = 42;
   const tableDefaults = {
     margin: { left: margin, right: margin },
+    tableWidth: CONTENT_WIDTH,
     styles: { fontSize: 8, cellPadding: 5, overflow: 'linebreak' as const },
     headStyles: { fillColor: INDIGO, textColor: 255, fontStyle: 'bold' as const },
     alternateRowStyles: { fillColor: [245, 247, 250] as [number, number, number] },
@@ -53,7 +69,7 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
       ['Organic results', String(snapshot.organicResults.length)],
       ['AI Overview', snapshot.aiOverview.present ? 'Present' : 'Not detected'],
     ],
-    columnStyles: { 0: { cellWidth: 120, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } },
+    columnStyles: { 0: { cellWidth: 120, fontStyle: 'bold' }, 1: { cellWidth: 391 } },
   });
 
   if (report) {
@@ -68,7 +84,7 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
         ['AI Overview opportunity', report.topSummary.aiOverviewOpportunity],
         ['Recommended action', report.topSummary.recommendedAction],
       ],
-      columnStyles: { 0: { cellWidth: 130, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } },
+      columnStyles: { 0: { cellWidth: 130, fontStyle: 'bold' }, 1: { cellWidth: 381 } },
     });
   }
 
@@ -77,8 +93,8 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
     ...tableDefaults,
     startY: y,
     head: [['#', 'Title', 'Domain', 'Page type']],
-    body: snapshot.organicResults.map((item) => [
-      String(item.position), item.title, item.domain, item.pageType || item.resultType || 'Organic',
+    body: snapshot.organicResults.slice(0, 20).map((item) => [
+      String(item.position), cleanText(item.title, 180), cleanText(item.domain, 60), cleanText(item.pageType || item.resultType || 'Organic', 50),
     ]),
     columnStyles: { 0: { cellWidth: 26 }, 1: { cellWidth: 245 }, 2: { cellWidth: 135 }, 3: { cellWidth: 105 } },
   });
@@ -90,9 +106,9 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
     head: [['Status', 'Summary']],
     body: [[
       snapshot.aiOverview.present ? 'Present' : 'Not detected',
-      snapshot.aiOverview.answerText || snapshot.aiOverview.statusNote || 'No AI Overview content was returned.',
+      cleanText(snapshot.aiOverview.answerText || snapshot.aiOverview.statusNote || 'No AI Overview content was returned.', 1800),
     ]],
-    columnStyles: { 0: { cellWidth: 90, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } },
+    columnStyles: { 0: { cellWidth: 90, fontStyle: 'bold' }, 1: { cellWidth: 421 } },
   });
 
   if (snapshot.aiOverview.citations.length) {
@@ -100,9 +116,12 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
       ...tableDefaults,
       startY: lastY(),
       head: [['AI Overview citation', 'Domain', 'Organic position']],
-      body: snapshot.aiOverview.citations.map((item) => [
-        item.title || item.url, item.domain, item.organicPosition == null ? 'Outside top 10' : String(item.organicPosition),
+      body: snapshot.aiOverview.citations.slice(0, 20).map((item) => [
+        cleanCitationTitle(item.title, item.domain, item.url),
+        cleanText(item.domain, 60),
+        item.organicPosition == null ? 'Outside top 10' : String(item.organicPosition),
       ]),
+      columnStyles: { 0: { cellWidth: 280 }, 1: { cellWidth: 155 }, 2: { cellWidth: 76 } },
     });
   }
 
@@ -112,8 +131,9 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
     startY: y,
     head: [['Feature', 'Present', 'Details / opportunity']],
     body: snapshot.features.map((feature) => [
-      feature.type, feature.present ? 'Yes' : 'No', feature.details || feature.opportunity || '',
+      cleanText(feature.type, 60), feature.present ? 'Yes' : 'No', cleanText(feature.details || feature.opportunity || '', 300),
     ]),
+    columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 55 }, 2: { cellWidth: 336 } },
   });
 
   if (report) {
@@ -129,7 +149,7 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
         ['User expectations', report.searchIntent.userExpectations],
         ['Evidence', report.searchIntent.evidence.join('\n• ')],
       ],
-      columnStyles: { 0: { cellWidth: 120, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } },
+      columnStyles: { 0: { cellWidth: 120, fontStyle: 'bold' }, 1: { cellWidth: 391 } },
     });
 
     y = sectionTitle('Content Recommendations', lastY());
@@ -147,7 +167,7 @@ export async function downloadSerpPdf(snapshot: SERPSnapshot, report: AnalysisRe
         ['E-E-A-T requirements', recommendations.eeatRequirements.join('\n• ')],
         ['Top actions', recommendations.topActions.join('\n• ')],
       ],
-      columnStyles: { 0: { cellWidth: 135, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } },
+      columnStyles: { 0: { cellWidth: 135, fontStyle: 'bold' }, 1: { cellWidth: 376 } },
     });
   }
 

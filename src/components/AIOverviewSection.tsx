@@ -8,6 +8,31 @@ interface AIOverviewSectionProps {
   capturedAt: string;
 }
 
+const isProviderIdentifier = (value?: string) =>
+  !value || /^(CAES|data:|[A-Za-z0-9_=-]{120,})/.test(value.trim());
+
+const looksLikeDomain = (value?: string) =>
+  Boolean(value && value.length < 100 && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(value.trim()));
+
+function citationDisplay(citation: AIOverview['citations'][number]) {
+  let urlDomain = '';
+  try { urlDomain = new URL(citation.url).hostname.replace(/^www\./, ''); } catch { /* Invalid provider URL */ }
+
+  const domain = !isProviderIdentifier(citation.domain) && looksLikeDomain(citation.domain)
+    ? citation.domain
+    : looksLikeDomain(citation.title)
+      ? citation.title!
+      : urlDomain || 'Source website';
+  const title = !isProviderIdentifier(citation.title) && citation.title !== domain
+    ? citation.title!
+    : domain;
+  const claim = !isProviderIdentifier(citation.supportedClaim)
+    ? citation.supportedClaim!
+    : 'Referenced as a source in the AI Overview.';
+
+  return { domain, title, claim };
+}
+
 export const AIOverviewSection: React.FC<AIOverviewSectionProps> = ({
   aiOverview,
   source,
@@ -121,55 +146,43 @@ export const AIOverviewSection: React.FC<AIOverviewSectionProps> = ({
             No direct citation links returned by the SERP provider for this AI Overview.
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-800 rounded-lg">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-300 font-semibold border-b border-slate-800 uppercase tracking-wider">
-                <tr>
-                  <th scope="col" className="py-2.5 px-3">Cited Site / Domain</th>
-                  <th scope="col" className="py-2.5 px-3">What It Supports</th>
-                  <th scope="col" className="py-2.5 px-3 text-center">In Organic Top 10?</th>
-                  <th scope="col" className="py-2.5 px-3 text-center">Organic Position</th>
-                  <th scope="col" className="py-2.5 px-3 text-center">Link</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80 bg-slate-900">
-                {aiOverview.citations.map((cite, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="py-2.5 px-3">
-                      <div className="font-semibold text-slate-100">{cite.title || cite.domain}</div>
-                      <div className="text-[11px] font-mono text-slate-400">{cite.domain}</div>
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-300">
-                      {cite.supportedClaim || 'General reference citation for answer claims.'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {cite.alsoInOrganicTop10 ? (
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800 whitespace-nowrap">
-                          Yes
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700 whitespace-nowrap">
-                          No
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-200">
-                      {cite.organicPosition ? `#${cite.organicPosition}` : 'N/A (>10)'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <a
-                        href={cite.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 text-slate-400 hover:text-indigo-400 inline-block transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/40 divide-y divide-slate-800/80">
+            {aiOverview.citations.map((cite, idx) => {
+              const display = citationDisplay(cite);
+              return (
+                <div
+                  key={`${cite.url}-${idx}`}
+                  className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_auto_auto] gap-3 lg:gap-5 items-center px-4 py-3 hover:bg-slate-800/40 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-slate-100 break-words">{display.title}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 truncate" title={display.domain}>{display.domain}</div>
+                  </div>
+                  <p className="min-w-0 text-xs leading-relaxed text-slate-300 break-words">{display.claim}</p>
+                  <div className="flex lg:block items-center gap-2 whitespace-nowrap">
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500 lg:hidden">Organic:</span>
+                    {cite.alsoInOrganicTop10 ? (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                        Top 10 #{cite.organicPosition}
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                        Outside top 10
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={cite.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open citation from ${display.domain}`}
+                    className="w-8 h-8 rounded-md border border-slate-700 text-slate-400 hover:text-indigo-300 hover:border-indigo-700 inline-flex items-center justify-center transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
