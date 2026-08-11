@@ -7,6 +7,10 @@ A Vite/React app with two Vercel serverless endpoints:
 
 API keys are read only by serverless functions and are never included in the browser bundle.
 
+After a SERP snapshot is loaded, **Download PDF** exports an A4 report containing
+the query details, executive summary, organic results, AI Overview, citations,
+SERP features, search intent, and content recommendations.
+
 The deployable handlers in `api/` load pre-bundled CommonJS implementations
 from `serverless/`. This avoids Vercel runtime module-resolution failures. If
 you change backend logic in `api-source/` or `server/`, run

@@ -17,7 +17,8 @@ import { PasteUploadModal } from './components/PasteUploadModal';
 import { SERPSnapshot, AnalysisReport, SerpQueryParams } from './types';
 import { DEMO_SNAPSHOT, DEMO_ANALYSIS } from './data/demoData';
 import { saveSnapshotToHistory } from './utils/history';
-import { AlertCircle, Sparkles, RefreshCw, KeyRound, Info, Upload } from 'lucide-react';
+import { downloadSerpPdf } from './utils/pdfExport';
+import { AlertCircle, Sparkles, RefreshCw, KeyRound, Info, Upload, Download } from 'lucide-react';
 
 export default function App() {
   const [queryParams, setQueryParams] = useState<SerpQueryParams>({
@@ -342,6 +343,17 @@ export default function App() {
         {/* Unified SERP Intelligence Report Output */}
         {snapshot && (
           <div>
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={() => downloadSerpPdf(snapshot, analysisReport)}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-lg transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PDF</span>
+              </button>
+            </div>
+
             {/* Top-of-report summary findings */}
             {analysisReport && (
               <TopSummary summary={analysisReport.topSummary} />
