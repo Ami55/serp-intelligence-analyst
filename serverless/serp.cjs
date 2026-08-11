@@ -65,6 +65,56 @@ function extractDomain(urlStr) {
     return urlStr || "unknown";
   }
 }
+function inferCountryCode(location) {
+  const normalized = location.toLowerCase();
+  const countryHints = [
+    [["canada", "quebec", "montreal", "vancouver", "toronto", "ottawa", "calgary"], "ca"],
+    [["united kingdom", "england", "scotland", "wales", "london", "manchester"], "uk"],
+    [["australia", "sydney", "melbourne", "brisbane"], "au"],
+    [["germany", "berlin", "munich", "hamburg"], "de"],
+    [["france", "paris", "lyon", "marseille"], "fr"],
+    [["japan", "tokyo", "osaka", "kyoto"], "jp"],
+    [["spain", "madrid", "barcelona"], "es"]
+  ];
+  return countryHints.find(([hints]) => hints.some((hint) => normalized.includes(hint)))?.[1] || "us";
+}
+function isConversationalFollowUp(text) {
+  return /^(if you (share|provide|tell)|tell me|let me know|i can (build|create|help|suggest))/i.test(text.trim());
+}
+function extractAiOverviewContent(rawAiOverview) {
+  if (typeof rawAiOverview === "string") return { answerText: rawAiOverview, answerBullets: [] };
+  if (rawAiOverview.text) return { answerText: rawAiOverview.text, answerBullets: [] };
+  if (Array.isArray(rawAiOverview.paragraphs)) {
+    const paragraphs2 = rawAiOverview.paragraphs.filter((text) => typeof text === "string" && !isConversationalFollowUp(text));
+    return { answerText: paragraphs2.join("\n\n"), answerBullets: [] };
+  }
+  const paragraphs = [];
+  const bullets = [];
+  const visitBlocks = (blocks) => {
+    blocks.forEach((block) => {
+      const snippet = String(block?.snippet || block?.text || "").trim();
+      if (snippet && !isConversationalFollowUp(snippet)) {
+        if (block.type === "paragraph") paragraphs.push(snippet);
+        else if (block.type === "heading") bullets.push(snippet);
+      }
+      if (block.type === "list" && Array.isArray(block.list)) {
+        block.list.forEach((item) => {
+          const itemText = [item?.title, item?.snippet].filter(Boolean).join(" ").trim();
+          if (itemText && !isConversationalFollowUp(itemText)) bullets.push(itemText);
+        });
+      }
+      if (Array.isArray(block.text_blocks)) visitBlocks(block.text_blocks);
+    });
+  };
+  if (Array.isArray(rawAiOverview.text_blocks)) visitBlocks(rawAiOverview.text_blocks);
+  if (!paragraphs.length && rawAiOverview.snippet && !isConversationalFollowUp(rawAiOverview.snippet)) {
+    paragraphs.push(rawAiOverview.snippet);
+  }
+  return {
+    answerText: paragraphs.join("\n\n"),
+    answerBullets: Array.from(new Set(bullets))
+  };
+}
 async function fetchLiveSerp(params) {
   const apiKey = process.env.SERPAPI_KEY || process.env.SERP_API_KEY;
   if (!apiKey || apiKey.trim() === "" || apiKey === "MY_SERPAPI_KEY") {
@@ -79,7 +129,8 @@ async function fetchLiveSerp(params) {
     api_key: apiKey,
     engine: params.searchEngine.toLowerCase().includes("google") ? "google" : "google",
     device: params.device === "mobile" ? "mobile" : "desktop",
-    hl: params.language === "Spanish" ? "es" : params.language === "French" ? "fr" : params.language === "German" ? "de" : "en"
+    hl: params.language === "Spanish" ? "es" : params.language === "French" ? "fr" : params.language === "German" ? "de" : "en",
+    gl: inferCountryCode(params.location)
   });
   if (params.location && params.location.trim()) {
     queryParams.set("location", params.location.trim());
@@ -141,34 +192,15 @@ async function fetchLiveSerp(params) {
   };
   if (rawAiOverview) {
     const isPresent = true;
-    let answerText = "";
-    let answerBullets = [];
-    if (typeof rawAiOverview === "string") {
-      answerText = rawAiOverview;
-    } else if (rawAiOverview.text) {
-      answerText = rawAiOverview.text;
-    } else if (Array.isArray(rawAiOverview.paragraphs)) {
-      answerText = rawAiOverview.paragraphs.join("\n\n");
-    } else if (Array.isArray(rawAiOverview.text_blocks)) {
-      answerText = rawAiOverview.text_blocks.map((b) => b.snippet || b.text || "").filter(Boolean).join("\n\n");
-    } else if (rawAiOverview.snippet) {
-      answerText = rawAiOverview.snippet;
-    }
-    if (Array.isArray(rawAiOverview.bullets)) {
-      answerBullets = rawAiOverview.bullets;
-    } else if (answerText) {
-      const sentences = answerText.split(/\n+/).filter((s) => s.trim().length > 0);
-      if (sentences.length > 1) {
-        answerBullets = sentences;
-      }
-    }
+    const { answerText, answerBullets: structuredBullets } = extractAiOverviewContent(rawAiOverview);
+    const answerBullets = Array.isArray(rawAiOverview.bullets) ? rawAiOverview.bullets.filter((text) => typeof text === "string" && !isConversationalFollowUp(text)) : structuredBullets;
     const citations = [];
     const rawRefs = rawAiOverview.references || rawAiOverview.sources || rawAiOverview.citations || rawAiOverview.links || [];
     if (Array.isArray(rawRefs)) {
       rawRefs.forEach((ref) => {
         const url = ref.link || ref.url || "";
         if (!url) return;
-        const domain = ref.domain || extractDomain(url);
+        const domain = extractDomain(url);
         const title = ref.title || ref.source || domain;
         const supportedClaim = ref.snippet || ref.claim || ref.context || void 0;
         const organicPos = top10DomainMap.get(domain.toLowerCase()) ?? null;

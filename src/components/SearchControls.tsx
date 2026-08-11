@@ -51,23 +51,26 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           {/* Location */}
           <div>
-            <label htmlFor="location-select" className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" /> Location / Country
+            <label htmlFor="location-input" className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" /> Search location
             </label>
-            <select
-              id="location-select"
+            <input
+              id="location-input"
+              type="text"
+              list="location-suggestions"
               value={queryParams.location}
               onChange={(e) => onQueryParamChange('location', e.target.value)}
+              placeholder="e.g. Montreal, Quebec, Canada"
               className="w-full px-3 py-1.5 text-xs text-slate-200 bg-slate-950 border border-slate-700/80 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="United States">United States</option>
-              <option value="United Kingdom">United Kingdom</option>
-              <option value="Canada">Canada</option>
-              <option value="Australia">Australia</option>
-              <option value="Germany">Germany</option>
-              <option value="France">France</option>
-              <option value="Japan">Japan</option>
-            </select>
+            />
+            <datalist id="location-suggestions">
+              <option value="Montreal, Quebec, Canada" />
+              <option value="Vancouver, British Columbia, Canada" />
+              <option value="Toronto, Ontario, Canada" />
+              <option value="New York, New York, United States" />
+              <option value="London, England, United Kingdom" />
+              <option value="Sydney, New South Wales, Australia" />
+            </datalist>
           </div>
 
           {/* Language */}

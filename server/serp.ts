@@ -13,6 +13,61 @@ function extractDomain(urlStr: string): string {
   }
 }
 
+function inferCountryCode(location: string): string {
+  const normalized = location.toLowerCase();
+  const countryHints: Array<[string[], string]> = [
+    [['canada', 'quebec', 'montreal', 'vancouver', 'toronto', 'ottawa', 'calgary'], 'ca'],
+    [['united kingdom', 'england', 'scotland', 'wales', 'london', 'manchester'], 'uk'],
+    [['australia', 'sydney', 'melbourne', 'brisbane'], 'au'],
+    [['germany', 'berlin', 'munich', 'hamburg'], 'de'],
+    [['france', 'paris', 'lyon', 'marseille'], 'fr'],
+    [['japan', 'tokyo', 'osaka', 'kyoto'], 'jp'],
+    [['spain', 'madrid', 'barcelona'], 'es'],
+  ];
+  return countryHints.find(([hints]) => hints.some((hint) => normalized.includes(hint)))?.[1] || 'us';
+}
+
+function isConversationalFollowUp(text: string): boolean {
+  return /^(if you (share|provide|tell)|tell me|let me know|i can (build|create|help|suggest))/i.test(text.trim());
+}
+
+function extractAiOverviewContent(rawAiOverview: any): { answerText: string; answerBullets: string[] } {
+  if (typeof rawAiOverview === 'string') return { answerText: rawAiOverview, answerBullets: [] };
+  if (rawAiOverview.text) return { answerText: rawAiOverview.text, answerBullets: [] };
+  if (Array.isArray(rawAiOverview.paragraphs)) {
+    const paragraphs = rawAiOverview.paragraphs.filter((text: unknown) => typeof text === 'string' && !isConversationalFollowUp(text));
+    return { answerText: paragraphs.join('\n\n'), answerBullets: [] };
+  }
+
+  const paragraphs: string[] = [];
+  const bullets: string[] = [];
+  const visitBlocks = (blocks: any[]) => {
+    blocks.forEach((block) => {
+      const snippet = String(block?.snippet || block?.text || '').trim();
+      if (snippet && !isConversationalFollowUp(snippet)) {
+        if (block.type === 'paragraph') paragraphs.push(snippet);
+        else if (block.type === 'heading') bullets.push(snippet);
+      }
+      if (block.type === 'list' && Array.isArray(block.list)) {
+        block.list.forEach((item: any) => {
+          const itemText = [item?.title, item?.snippet].filter(Boolean).join(' ').trim();
+          if (itemText && !isConversationalFollowUp(itemText)) bullets.push(itemText);
+        });
+      }
+      if (Array.isArray(block.text_blocks)) visitBlocks(block.text_blocks);
+    });
+  };
+
+  if (Array.isArray(rawAiOverview.text_blocks)) visitBlocks(rawAiOverview.text_blocks);
+  if (!paragraphs.length && rawAiOverview.snippet && !isConversationalFollowUp(rawAiOverview.snippet)) {
+    paragraphs.push(rawAiOverview.snippet);
+  }
+  return {
+    answerText: paragraphs.join('\n\n'),
+    answerBullets: Array.from(new Set(bullets)),
+  };
+}
+
 /**
  * Calls SerpApi and normalizes response into SERPSnapshot
  */
@@ -45,6 +100,7 @@ export async function fetchLiveSerp(params: {
     engine: params.searchEngine.toLowerCase().includes('google') ? 'google' : 'google',
     device: params.device === 'mobile' ? 'mobile' : 'desktop',
     hl: params.language === 'Spanish' ? 'es' : params.language === 'French' ? 'fr' : params.language === 'German' ? 'de' : 'en',
+    gl: inferCountryCode(params.location),
   });
 
   if (params.location && params.location.trim()) {
@@ -122,31 +178,10 @@ export async function fetchLiveSerp(params: {
 
   if (rawAiOverview) {
     const isPresent = true;
-    let answerText = '';
-    let answerBullets: string[] = [];
-
-    // Extract text blocks
-    if (typeof rawAiOverview === 'string') {
-      answerText = rawAiOverview;
-    } else if (rawAiOverview.text) {
-      answerText = rawAiOverview.text;
-    } else if (Array.isArray(rawAiOverview.paragraphs)) {
-      answerText = rawAiOverview.paragraphs.join('\n\n');
-    } else if (Array.isArray(rawAiOverview.text_blocks)) {
-      answerText = rawAiOverview.text_blocks.map((b: any) => b.snippet || b.text || '').filter(Boolean).join('\n\n');
-    } else if (rawAiOverview.snippet) {
-      answerText = rawAiOverview.snippet;
-    }
-
-    if (Array.isArray(rawAiOverview.bullets)) {
-      answerBullets = rawAiOverview.bullets;
-    } else if (answerText) {
-      // Split into logical bullet-like sentences if helpful
-      const sentences = answerText.split(/\n+/).filter(s => s.trim().length > 0);
-      if (sentences.length > 1) {
-        answerBullets = sentences;
-      }
-    }
+    const { answerText, answerBullets: structuredBullets } = extractAiOverviewContent(rawAiOverview);
+    const answerBullets = Array.isArray(rawAiOverview.bullets)
+      ? rawAiOverview.bullets.filter((text: unknown) => typeof text === 'string' && !isConversationalFollowUp(text))
+      : structuredBullets;
 
     // Extract citations
     const citations: AIOverviewCitation[] = [];
@@ -156,7 +191,7 @@ export async function fetchLiveSerp(params: {
       rawRefs.forEach((ref: any) => {
         const url = ref.link || ref.url || '';
         if (!url) return;
-        const domain = ref.domain || extractDomain(url);
+        const domain = extractDomain(url);
         const title = ref.title || ref.source || domain;
         const supportedClaim = ref.snippet || ref.claim || ref.context || undefined;
 

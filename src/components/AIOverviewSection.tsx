@@ -91,7 +91,7 @@ export const AIOverviewSection: React.FC<AIOverviewSectionProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 text-xs text-slate-300 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 whitespace-nowrap">
-          <span>Date: {new Date(capturedAt).toLocaleDateString()}</span>
+          <span>Captured: {new Date(capturedAt).toLocaleString()}</span>
           <span>•</span>
           <span>Source: <strong className="text-slate-200">{sourceLabel}</strong></span>
         </div>

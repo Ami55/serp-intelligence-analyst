@@ -16,6 +16,12 @@ from `serverless/`. This avoids Vercel runtime module-resolution failures. If
 you change backend logic in `api-source/` or `server/`, run
 `npm run bundle:functions` and commit the updated `serverless/*.cjs` files.
 
+For the closest reproducible comparison with Google, enter a city-level search
+location such as `Montreal, Quebec, Canada`. The backend sends both SerpApi's
+`location` and a matching Google country code (`gl`). Structured AI Overview
+paragraphs, headings, and list items are normalized separately, while provider
+identifiers and conversational follow-up prompts are excluded.
+
 ## Local development
 
 1. Run `npm install`.
