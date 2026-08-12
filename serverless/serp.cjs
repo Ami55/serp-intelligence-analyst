@@ -24,35 +24,113 @@ __export(serp_exports, {
 module.exports = __toCommonJS(serp_exports);
 
 // src/utils/pageType.ts
+var includesAny = (value, patterns) => patterns.some((pattern) => value.includes(pattern));
 function classifyPageType(url = "", title = "", snippet = "", resultType = "") {
-  const lowerUrl = (url || "").toLowerCase();
-  const lowerTitle = (title || "").toLowerCase();
-  const lowerSnippet = (snippet || "").toLowerCase();
-  const lowerResult = (resultType || "").toLowerCase();
-  if (lowerTitle.includes("best ") || lowerTitle.includes("top 10") || lowerTitle.includes("top 5") || lowerTitle.includes("top 15") || lowerTitle.includes(" review") || lowerTitle.includes(" vs ") || lowerTitle.includes("versus") || lowerTitle.includes("comparison") || lowerTitle.includes("alternative") || lowerResult.includes("listicle") || lowerResult.includes("review")) {
-    return "Review / Comparison";
+  const lowerUrl = url.toLowerCase();
+  const lowerTitle = title.toLowerCase();
+  const lowerSnippet = snippet.toLowerCase();
+  const lowerResult = resultType.toLowerCase();
+  let hostname = "";
+  let pathname = lowerUrl;
+  try {
+    const parsed = new URL(url);
+    hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    pathname = parsed.pathname.toLowerCase();
+  } catch {
   }
-  if (lowerUrl.includes("/blog/") || lowerUrl.includes("/article/") || lowerUrl.includes("/news/") || lowerUrl.includes("/post/") || lowerUrl.includes("/insights/") || lowerTitle.startsWith("how to") || lowerTitle.includes("what is") || lowerTitle.includes("guide to") || lowerTitle.includes("tips for") || lowerTitle.includes("definition") || lowerResult.includes("informational")) {
-    return "Blog / Informational";
+  const communityDomain = includesAny(hostname, ["reddit.com", "quora.com", "stackexchange.com", "tripadvisor.com/showtopic"]);
+  if (communityDomain || includesAny(pathname, ["/forum/", "/forums/", "/community/", "/discussion/", "/showtopic"])) {
+    return "Forum / Community";
   }
-  if (lowerUrl.includes("/category/") || lowerUrl.includes("/categories/") || lowerUrl.includes("/collections/") || lowerUrl.includes("/shop/") || lowerUrl.includes("/store/") || lowerTitle.includes("shop all") || lowerTitle.includes("buy online") || lowerTitle.includes("store") || lowerResult.includes("category")) {
-    return "E-commerce Category";
-  }
-  if (lowerUrl.includes("/tool/") || lowerUrl.includes("/calculator/") || lowerUrl.includes("/app/") || lowerUrl.includes("/generator/") || lowerTitle.includes("free online") || lowerTitle.includes("calculator") || lowerTitle.includes("generator") || lowerTitle.includes("converter")) {
-    return "SaaS / Web Tool";
-  }
-  if (lowerUrl.includes("wikipedia.org") || lowerUrl.includes("yelp.com") || lowerUrl.includes("tripadvisor.com") || lowerUrl.includes("g2.com") || lowerUrl.includes("capterra.com") || lowerUrl.includes("trustpilot.com") || lowerUrl.includes("linkedin.com") || lowerUrl.includes("/directory/") || lowerUrl.includes("/listings/")) {
-    return "Directory / Marketplace";
-  }
-  if (lowerUrl.includes("/docs/") || lowerUrl.includes("/documentation/") || lowerUrl.includes("/help/") || lowerUrl.includes("/kb/") || lowerUrl.includes("/guide/") || lowerUrl.includes("/learn/")) {
-    return "Guide / Documentation";
-  }
-  if (lowerUrl.endsWith(".gov") || lowerUrl.includes(".gov/") || lowerUrl.endsWith(".edu") || lowerUrl.includes(".edu/") || lowerUrl.includes("/about") || lowerUrl.includes("/contact")) {
+  if (/\.gov($|\.)|\.edu($|\.)/.test(hostname) || includesAny(pathname, ["/government/", "/university/"])) {
     return "Official / Institutional";
   }
-  if (lowerUrl.includes("/pricing") || lowerUrl.includes("/features") || lowerUrl.includes("/product") || lowerUrl.includes("/solutions") || lowerResult.includes("landing") || lowerResult.includes("product") || lowerSnippet.includes("free trial") || lowerSnippet.includes("sign up")) {
-    return "Commercial / Product";
+  const marketplaceDomain = includesAny(hostname, [
+    "tripadvisor.",
+    "viator.",
+    "getyourguide.",
+    "toursbylocals.",
+    "expedia.",
+    "booking.com",
+    "airbnb.",
+    "klook.",
+    "g2.com",
+    "capterra.com",
+    "yelp.com"
+  ]);
+  const marketplacePage = includesAny(pathname, [
+    "/tours/",
+    "/tour/",
+    "/experiences/",
+    "/experience/",
+    "/activities/",
+    "/activity/",
+    "/attractions/",
+    "/attraction/",
+    "/things-to-do/",
+    "/marketplace/",
+    "/listings/",
+    "/directory/"
+  ]) || includesAny(lowerTitle, ["book a tour", "book tours", "guided tour", "tickets & tours", "things to do: book"]);
+  if (marketplaceDomain && (marketplacePage || hostname.includes("tripadvisor."))) {
+    return "Directory / Marketplace";
   }
+  const editorialPath = includesAny(pathname, [
+    "/blog/",
+    "/blogs/",
+    "/article/",
+    "/articles/",
+    "/news/",
+    "/post/",
+    "/insights/",
+    "/stories/",
+    "/travel-guide/",
+    "/travel-guides/",
+    "/destinations/",
+    "/tips/"
+  ]);
+  const editorialTitle = /(^|\b)(how to|what to|what is|why |tips? for|things? to know|before (you )?(go|travel|visit)|travel guide|city guide|complete guide|one day guide|first-timers?|itinerary|things? to do|places? to (visit|see)|where to (stay|eat)|when to visit)(\b|$)/i.test(title);
+  const editorialSnippet = includesAny(lowerSnippet, [
+    "travel tips",
+    "plan your trip",
+    "best time to visit",
+    "things to know",
+    "public transportation",
+    "neighborhoods",
+    "neighbourhoods",
+    "travel guide"
+  ]);
+  if (editorialPath || editorialTitle || editorialSnippet || lowerResult.includes("informational")) {
+    return "Blog / Informational";
+  }
+  if (includesAny(pathname, ["/docs/", "/documentation/", "/help/", "/kb/", "/learn/"])) {
+    return "Guide / Documentation";
+  }
+  if (includesAny(pathname, ["/category/", "/categories/", "/collections/", "/shop/", "/store/"]) || includesAny(lowerTitle, ["shop all", "buy online"]) || lowerResult.includes("category")) {
+    return "E-commerce Category";
+  }
+  if (includesAny(pathname, ["/tool/", "/calculator/", "/app/", "/generator/"]) || includesAny(lowerTitle, ["free online", "calculator", "generator", "converter"])) {
+    return "SaaS / Web Tool";
+  }
+  const comparisonIntent = /\b(review|reviews| vs |versus|comparison|alternatives?)\b/i.test(` ${title} `) || lowerResult.includes("review");
+  if (comparisonIntent) return "Review / Comparison";
+  const transactionalPage = includesAny(pathname, [
+    "/pricing",
+    "/features",
+    "/product",
+    "/products/",
+    "/solutions",
+    "/buy/",
+    "/checkout/",
+    "/book/",
+    "/booking/",
+    "/reserve/",
+    "/tickets/",
+    "/plans/",
+    "/signup/"
+  ]) || includesAny(lowerTitle, ["buy ", "book ", "pricing", "plans & pricing", "reserve "]) || includesAny(lowerSnippet, ["free trial", "sign up", "book now", "reserve now", "check availability"]) || lowerResult.includes("landing") || lowerResult.includes("product");
+  if (transactionalPage) return marketplaceDomain ? "Directory / Marketplace" : "Commercial / Product";
+  if (title || snippet) return "Blog / Informational";
   return "Commercial / Product";
 }
 

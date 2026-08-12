@@ -22,6 +22,12 @@ location such as `Montreal, Quebec, Canada`. The backend sends both SerpApi's
 paragraphs, headings, and list items are normalized separately, while provider
 identifiers and conversational follow-up prompts are excluded.
 
+Page-type classification evaluates the specific result page before the parent
+brand. Editorial travel guides and blog posts remain `Blog / Informational`
+even when published by tour operators; booking, tour, activity and marketplace
+listings are classified as `Commercial / Product` or `Directory / Marketplace`.
+Community discussions such as Reddit use `Forum / Community`.
+
 ## Local development
 
 1. Run `npm install`.
