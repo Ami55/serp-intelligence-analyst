@@ -20,9 +20,24 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
   isLoading
 }) => {
 
+  const locationOptions = [
+    'United States',
+    'Montreal, Quebec, Canada',
+    'Vancouver, British Columbia, Canada',
+    'Toronto, Ontario, Canada',
+    'New York, New York, United States',
+    'London, England, United Kingdom',
+    'Paris, France',
+    'Berlin, Germany',
+    'Sydney, New South Wales, Australia',
+    'Tokyo, Japan',
+  ];
+  const hasPresetLocation = locationOptions.includes(queryParams.location);
+  const isCustomLocation = !hasPresetLocation;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!queryParams.keyword.trim() || isLoading) return;
+    if (!queryParams.keyword.trim() || !queryParams.location.trim() || queryParams.location === '__custom__' || isLoading) return;
     onFetchSerp();
   };
 
@@ -51,26 +66,31 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           {/* Location */}
           <div>
-            <label htmlFor="location-input" className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
+            <label htmlFor="location-select" className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-slate-400" /> Search location
             </label>
-            <input
-              id="location-input"
-              type="text"
-              list="location-suggestions"
-              value={queryParams.location}
+            <select
+              id="location-select"
+              value={hasPresetLocation ? queryParams.location : '__custom__'}
               onChange={(e) => onQueryParamChange('location', e.target.value)}
-              placeholder="e.g. Montreal, Quebec, Canada"
               className="w-full px-3 py-1.5 text-xs text-slate-200 bg-slate-950 border border-slate-700/80 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <datalist id="location-suggestions">
-              <option value="Montreal, Quebec, Canada" />
-              <option value="Vancouver, British Columbia, Canada" />
-              <option value="Toronto, Ontario, Canada" />
-              <option value="New York, New York, United States" />
-              <option value="London, England, United Kingdom" />
-              <option value="Sydney, New South Wales, Australia" />
-            </datalist>
+            >
+              {locationOptions.map((location) => (
+                <option key={location} value={location}>{location}</option>
+              ))}
+              <option value="__custom__">Custom city / location…</option>
+            </select>
+            {isCustomLocation && (
+              <input
+                id="custom-location-input"
+                type="text"
+                value={queryParams.location === '__custom__' ? '' : queryParams.location}
+                onChange={(e) => onQueryParamChange('location', e.target.value)}
+                placeholder="City, region, country"
+                autoFocus
+                className="w-full mt-2 px-3 py-1.5 text-xs text-slate-200 bg-slate-950 border border-indigo-700/80 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            )}
           </div>
 
           {/* Language */}
@@ -147,7 +167,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           <div className="flex items-center space-x-2">
             <button
               type="submit"
-              disabled={isLoading || !queryParams.keyword.trim()}
+              disabled={isLoading || !queryParams.keyword.trim() || !queryParams.location.trim() || queryParams.location === '__custom__'}
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-medium text-sm rounded-lg transition-colors shadow-xs flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
             >
               {isLoading ? (

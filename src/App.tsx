@@ -63,7 +63,7 @@ export default function App() {
    */
   const handleFetchSerp = async () => {
     const currentKeyword = queryParams.keyword.trim();
-    if (!currentKeyword) return;
+    if (!currentKeyword || !queryParams.location.trim() || queryParams.location === '__custom__') return;
 
     // Generate unique request ID
     requestIdRef.current += 1;
