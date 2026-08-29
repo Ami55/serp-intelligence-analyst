@@ -388,6 +388,10 @@ export default function App() {
         )}
       </main>
 
+      <footer className="sg-app-footer">
+        <p>© 2026 SERP Intelligence Analyst. Developed by <strong>Ami - SEO Girl</strong>. All rights reserved.</p>
+      </footer>
+
       <PasteUploadModal
         isOpen={isPasteUploadOpen}
         onClose={() => setIsPasteUploadOpen(false)}
