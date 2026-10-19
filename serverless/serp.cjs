@@ -49,7 +49,6 @@ function classifyPageType(url = "", title = "", snippet = "", resultType = "") {
     "tripadvisor.",
     "viator.",
     "getyourguide.",
-    "toursbylocals.",
     "expedia.",
     "booking.com",
     "airbnb.",
