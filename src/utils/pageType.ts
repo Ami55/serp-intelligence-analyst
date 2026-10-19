@@ -46,7 +46,7 @@ export function classifyPageType(
   }
 
   const marketplaceDomain = includesAny(hostname, [
-    'tripadvisor.', 'viator.', 'getyourguide.', 'toursbylocals.', 'expedia.',
+    'tripadvisor.', 'viator.', 'getyourguide.', 'expedia.',
     'booking.com', 'airbnb.', 'klook.', 'g2.com', 'capterra.com', 'yelp.com',
   ]);
   const marketplacePage = includesAny(pathname, [
